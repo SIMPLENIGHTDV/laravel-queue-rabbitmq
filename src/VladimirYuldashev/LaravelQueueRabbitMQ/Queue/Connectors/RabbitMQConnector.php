@@ -19,7 +19,22 @@ class RabbitMQConnector implements ConnectorInterface
 	public function connect(array $config)
 	{
 		// create connection with AMQP
-		$connection = new AMQPConnection($config['host'], $config['port'], $config['login'], $config['password'], $config['vhost']);
+		try {
+			$connection = new AMQPConnection($config['host'], $config['port'], $config['login'], $config['password'], $config['vhost']);
+		}
+		catch (\PhpAmqpLib\Exception\AMQPRuntimeException $e)
+		{
+			$max = 120;
+			$file = storage_path('cache').'/ampq';
+			if (is_file($file) && (time() - filemtime($file) < $max)) {
+				$timeout = file_get_contents($file);
+			} else {
+				$timeout = 1;
+			}
+			sleep($timeout);
+			file_put_contents($file, min($max, $timeout * 2));
+			throw $e;
+		}
 
 		return new RabbitMQQueue(
 			$connection,
